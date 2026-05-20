@@ -30,18 +30,41 @@ workflows:
         script: |
           cd ios
           pod install --repo-update
-      - name: Build iOS (no codesign)
-        script: flutter build ios --release --no-codesign
+      - name: Build iOS via xcodebuild (no signing)
+        script: |
+          set -e
+          # Flutter prep (generates Generated.xcconfig + assets); xcodebuild
+          # below replaces the signing-required final step that flutter wraps.
+          flutter build ios --release --no-codesign --config-only || true
+
+          cd ios
+          xcodebuild \
+            -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            DEVELOPMENT_TEAM="" \
+            build
       - name: Package unsigned .ipa
         script: |
           set -e
-          APP_PATH="build/ios/iphoneos/Runner.app"
-          if [ ! -d "$APP_PATH" ]; then
-            echo "Runner.app not found"; exit 1
+          APP_PATH=$(find ios/build -path "*Release-iphoneos/Runner.app" -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "Runner.app not found"
+            find ios/build -name "Runner.app" -type d || true
+            exit 1
           fi
-          PAYLOAD_DIR="build/ios/iphoneos/Payload"
+          echo "Runner.app: $APP_PATH"
+          OUT_DIR="build/ios/iphoneos"
+          PAYLOAD_DIR="$OUT_DIR/Payload"
           mkdir -p "$PAYLOAD_DIR"
           cp -R "$APP_PATH" "$PAYLOAD_DIR/Runner.app"
-          (cd build/ios/iphoneos && zip -qr goanime-unsigned.ipa Payload)
+          (cd "$OUT_DIR" && zip -qr goanime-unsigned.ipa Payload)
+          ls -lh "$OUT_DIR/goanime-unsigned.ipa"
     artifacts:
       - build/ios/iphoneos/goanime-unsigned.ipa
