@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../models/jikan_models.dart';
 import '../theme/app_colors.dart';
 import '../utils/responsive.dart';
+import 'optimized_anime_image.dart';
+import 'shimmer_loading.dart';
 
 /// Card de anime otimizado com animações leves e responsivo
 class ResponsiveAnimeCard extends StatefulWidget {
@@ -79,25 +80,16 @@ class _ResponsiveAnimeCardState extends State<ResponsiveAnimeCard> {
                       fit: StackFit.expand,
                       children: [
                         // Imagem
-                        CachedNetworkImage(
-                          imageUrl: widget.anime.largImageUrl ?? widget.anime.imageUrl,
-                          fit: BoxFit.cover,
-                          filterQuality: FilterQuality.high,
-                          memCacheWidth: (cardWidth * 3).toInt(),
-                          memCacheHeight: (cardHeight * 3).toInt(),
-                          placeholder: (context, url) => Container(
-                            color: AppColors.surface,
-                            child: const Center(
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppColors.primary,
-                              ),
-                            ),
+                        OptimizedAnimeImage(
+                          imageUrl: selectAnimeImageUrl(
+                            smallUrl: widget.anime.imageUrl,
+                            largeUrl: widget.anime.largImageUrl,
+                            size: AnimeImageSize.medium,
                           ),
-                          errorWidget: (context, url, error) => Container(
-                            color: AppColors.surface,
-                            child: const Icon(Icons.error, color: Colors.white54),
-                          ),
+                          width: cardWidth,
+                          height: cardHeight,
+                          size: AnimeImageSize.medium,
+                          borderRadius: BorderRadius.zero,
                         ),
 
                         // Gradient overlay
@@ -275,36 +267,9 @@ class ResponsiveAnimeList extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: padding),
       itemCount: 5,
       itemBuilder: (context, index) {
-        return Container(
-          width: cardWidth,
-          margin: EdgeInsets.only(right: spacing),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                height: cardHeight,
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                width: cardWidth * 0.7,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-            ],
-          ),
+        return Padding(
+          padding: EdgeInsets.only(right: spacing),
+          child: ShimmerAnimeCard(width: cardWidth, height: cardHeight),
         );
       },
     );

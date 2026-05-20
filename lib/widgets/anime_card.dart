@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../models/jikan_models.dart';
+import 'optimized_anime_image.dart';
 
 class AnimeCard extends StatelessWidget {
   final JikanAnime anime;
@@ -35,35 +35,15 @@ class AnimeCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               child: Stack(
                 children: [
-                  CachedNetworkImage(
-                    imageUrl: anime.largImageUrl ?? anime.imageUrl,
+                  OptimizedAnimeImage(
+                    imageUrl: selectAnimeImageUrl(
+                      smallUrl: anime.imageUrl,
+                      largeUrl: anime.largImageUrl,
+                      size: AnimeImageSize.medium,
+                    ),
                     width: width,
                     height: height,
-                    fit: BoxFit.cover,
-                    filterQuality: FilterQuality.high,
-                    memCacheWidth: (width * 3).toInt(),
-                    memCacheHeight: (height * 3).toInt(),
-                    maxWidthDiskCache: (width * 3).toInt(),
-                    maxHeightDiskCache: (height * 3).toInt(),
-                    placeholder: (context, url) => Container(
-                      width: width,
-                      height: height,
-                      color: Colors.grey[900],
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.orange,
-                          ),
-                          strokeWidth: 2,
-                        ),
-                      ),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      width: width,
-                      height: height,
-                      color: Colors.grey[900],
-                      child: const Icon(Icons.error, color: Colors.white54),
-                    ),
+                    size: AnimeImageSize.medium,
                   ),
                   // Score badge
                   if (showScore && anime.score != null)
@@ -143,38 +123,18 @@ class AnimeCardLarge extends StatelessWidget {
         child: Row(
           children: [
             // Imagem
-            ClipRRect(
+            OptimizedAnimeImage(
+              imageUrl: selectAnimeImageUrl(
+                smallUrl: anime.imageUrl,
+                largeUrl: anime.largImageUrl,
+                size: AnimeImageSize.small,
+              ),
+              width: 100,
+              height: 140,
+              size: AnimeImageSize.small,
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(12),
                 bottomLeft: Radius.circular(12),
-              ),
-              child: CachedNetworkImage(
-                imageUrl: anime.largImageUrl ?? anime.imageUrl,
-                width: 100,
-                height: 140,
-                fit: BoxFit.cover,
-                filterQuality: FilterQuality.high,
-                memCacheWidth: 300,
-                memCacheHeight: 420,
-                maxWidthDiskCache: 300,
-                maxHeightDiskCache: 420,
-                placeholder: (context, url) => Container(
-                  width: 100,
-                  height: 140,
-                  color: Colors.grey[800],
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
-                      strokeWidth: 2,
-                    ),
-                  ),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  width: 100,
-                  height: 140,
-                  color: Colors.grey[800],
-                  child: const Icon(Icons.error, color: Colors.white54),
-                ),
               ),
             ),
             // Informações

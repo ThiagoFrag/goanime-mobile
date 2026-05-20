@@ -5,11 +5,15 @@ import 'package:flutter/rendering.dart';
 class PerformanceConfig {
   PerformanceConfig._();
 
-  /// Inicializa configurações de performance
+  /// Inicializa configurações de performance.
+  ///
+  /// Cache de imagens em memória é puxado bem alto porque o app escala muitos
+  /// thumbnails de anime/manga simultâneos. Em devices low-end o GC força
+  /// eviction de qualquer jeito, então o cap só evita pressão quando há
+  /// memória disponível.
   static void init() {
-    // Aumenta o limite de cache de imagens para 200MB
-    PaintingBinding.instance.imageCache.maximumSize = 500;
-    PaintingBinding.instance.imageCache.maximumSizeBytes = 200 << 20; // 200MB
+    PaintingBinding.instance.imageCache.maximumSize = 800;
+    PaintingBinding.instance.imageCache.maximumSizeBytes = 256 << 20; // 256MB
   }
 
   /// Limpa cache de imagens se necessário (para liberar memória)
