@@ -1,0 +1,47 @@
+workflows:
+  ios-unsigned:
+    name: GoAnime iOS unsigned
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+    scripts:
+      - name: Materialize .env
+        script: |
+          set -e
+          if [ -n "$DOTENV" ]; then
+            printf '%s' "$DOTENV" > .env
+          else
+            cp .env.example .env
+          fi
+      - name: Flutter packages
+        script: flutter pub get
+      - name: Flutter analyze
+        script: flutter analyze --no-fatal-infos
+        ignore_failure: true
+      - name: Pod install
+        script: |
+          cd ios
+          pod install --repo-update
+      - name: Build iOS (no codesign)
+        script: flutter build ios --release --no-codesign
+      - name: Package unsigned .ipa
+        script: |
+          set -e
+          APP_PATH="build/ios/iphoneos/Runner.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Runner.app not found"; exit 1
+          fi
+          PAYLOAD_DIR="build/ios/iphoneos/Payload"
+          mkdir -p "$PAYLOAD_DIR"
+          cp -R "$APP_PATH" "$PAYLOAD_DIR/Runner.app"
+          (cd build/ios/iphoneos && zip -qr goanime-unsigned.ipa Payload)
+    artifacts:
+      - build/ios/iphoneos/goanime-unsigned.ipa
