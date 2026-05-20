@@ -57,7 +57,7 @@ dependencies:
   # Internationalization support
   flutter_localizations:
     sdk: flutter
-  intl: ^0.19.0
+  intl: ^0.20.2
   # Environment variables loader
   flutter_dotenv: ^5.1.0
   # Bottom navigation bar

@@ -110,8 +110,8 @@ class _MinimalHomeScreenState extends State<MinimalHomeScreen>
       
       if (mounted) {
         setState(() {
-          _popularMangas = popular;
-          _recentMangas = recent;
+          _popularMangas = popular.cast<Map<String, dynamic>>();
+          _recentMangas = recent.cast<Map<String, dynamic>>();
         });
       }
     } catch (e) {
