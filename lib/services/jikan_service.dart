@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -79,7 +80,9 @@ class JikanService {
   static HomeData? _homeDataCache;
   static final Map<String, _CacheEntry<List<JikanAnime>>> _cache = {};
   static const int _maxCacheSize = 50;
-  static bool _isLoadingHome = false;
+  // Single-flight: callers concorrentes aguardam o mesmo Completer em vez de
+  // fazer busy-wait com Future.delayed.
+  static Completer<HomeData>? _homeLoadCompleter;
 
   /// Limpa cache expirado
   static void _cleanExpiredCache() {
@@ -149,14 +152,11 @@ class JikanService {
       return _homeDataCache!;
     }
 
-    // Evita múltiplas requisições simultâneas
-    if (_isLoadingHome) {
-      debugPrint('[JikanService] Already loading, waiting...');
-      // Espera o carregamento terminar
-      while (_isLoadingHome) {
-        await Future.delayed(const Duration(milliseconds: 100));
-      }
-      if (_homeDataCache != null) return _homeDataCache!;
+    // Single-flight: se já há um load em andamento, retorna o Future dele.
+    final existing = _homeLoadCompleter;
+    if (existing != null) {
+      debugPrint('[JikanService] Already loading, awaiting in-flight Future');
+      return existing.future;
     }
 
     // Tenta carregar do cache persistente primeiro
@@ -168,7 +168,8 @@ class JikanService {
       }
     }
 
-    _isLoadingHome = true;
+    final completer = Completer<HomeData>();
+    _homeLoadCompleter = completer;
     debugPrint('[JikanService] Loading all home data in parallel...');
 
     try {
@@ -219,11 +220,11 @@ class JikanService {
       _homeDataCache = homeData;
       _persistHomeData(homeData);
 
+      completer.complete(homeData);
       return homeData;
     } catch (e) {
       debugPrint('[JikanService] Error loading home data: $e');
-      // Retorna dados vazios em caso de erro
-      return HomeData(
+      final fallback = HomeData(
         seasonAnimes: [],
         topAnimes: [],
         actionAnimes: [],
@@ -231,8 +232,10 @@ class JikanService {
         comedyAnimes: [],
         fantasyAnimes: [],
       );
+      completer.complete(fallback);
+      return fallback;
     } finally {
-      _isLoadingHome = false;
+      _homeLoadCompleter = null;
     }
   }
 

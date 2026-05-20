@@ -105,4 +105,33 @@ class AppColors {
   static Color get primaryShadow => primary.withValues(alpha: 0.3);
   static Color get secondaryShadow => secondary.withValues(alpha: 0.3);
   static Color get accentShadow => accent.withValues(alpha: 0.3);
+
+  // VR/Quest specific colors - More vibrant for better visibility in VR
+  static const Color vrPrimary = Color(0xFF00E5FF); // Brighter Cyan for VR
+  static const Color vrSecondary = Color(0xFFB388FF); // Brighter Purple for VR
+  static const Color vrAccent = Color(0xFFFF80AB); // Brighter Pink for VR
+  static const Color vrSurface = Color(0xFF1A1A2E); // Darker blue-ish surface for depth
+  static const Color vrSurfaceLight = Color(0xFF252542); // Elevated VR surface
+  static const Color vrGlow = Color(0xFF00E5FF); // Neon glow color
+
+  // VR Gradients - More dramatic for immersive experience
+  static const List<Color> vrHeroGradient = [
+    Color(0xFF00E5FF), // Bright Cyan
+    Color(0xFF7C4DFF), // Deep Purple
+    Color(0xFFFF4081), // Pink accent
+  ];
+
+  static const List<Color> vrCardGradient = [
+    Color(0xFF1A1A2E),
+    Color(0xFF16213E),
+  ];
+
+  static const List<Color> vrGlowGradient = [
+    Color(0xFF00E5FF),
+    Color(0xFF00BCD4),
+  ];
+
+  /// Retorna cor baseada no modo VR
+  static Color getPrimaryForDevice(bool isVR) => isVR ? vrPrimary : primary;
+  static Color getSurfaceForDevice(bool isVR) => isVR ? vrSurface : surface;
 }

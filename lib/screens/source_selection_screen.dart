@@ -4,6 +4,7 @@ import '../main.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_colors.dart';
 import '../services/allanime_service.dart';
+import '../services/animedrive_service.dart';
 import '../widgets/watchlist_button.dart';
 import 'episode_list_screen.dart';
 
@@ -29,10 +30,13 @@ class _SourceSelectionScreenState extends State<SourceSelectionScreen>
 
   bool _isSearchingAllAnime = false;
   bool _isSearchingAnimeFire = false;
+  bool _isSearchingAnimeDrive = false;
   List<AllAnimeShow> _allAnimeResults = [];
   String? _allAnimeErrorMessage;
   List<Anime> _animeFireResults = [];
   String? _animeFireErrorMessage;
+  List<AnimeDriveShow> _animeDriveResults = [];
+  String? _animeDriveErrorMessage;
 
   @override
   void initState() {
@@ -44,6 +48,7 @@ class _SourceSelectionScreenState extends State<SourceSelectionScreen>
     _animationController.forward();
     _searchAllAnime();
     _searchAnimeFire();
+    _searchAnimeDrive();
   }
 
   @override
@@ -115,6 +120,36 @@ class _SourceSelectionScreenState extends State<SourceSelectionScreen>
       setState(() {
         _isSearchingAnimeFire = false;
         _animeFireErrorMessage = 'Error searching on AnimeFire';
+      });
+    }
+  }
+
+  Future<void> _searchAnimeDrive() async {
+    setState(() {
+      _isSearchingAnimeDrive = true;
+      _animeDriveErrorMessage = null;
+    });
+
+    try {
+      final results = await AnimeDriveService.searchAnime(widget.animeTitle);
+
+      if (results.isNotEmpty) {
+        setState(() {
+          _animeDriveResults = results;
+          _isSearchingAnimeDrive = false;
+        });
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _isSearchingAnimeDrive = false;
+          _animeDriveErrorMessage = 'Anime not found on AnimeDrive';
+        });
+      }
+    } catch (e) {
+      debugPrint('Error searching AnimeDrive: $e');
+      setState(() {
+        _isSearchingAnimeDrive = false;
+        _animeDriveErrorMessage = 'Error searching on AnimeDrive';
       });
     }
   }
@@ -204,6 +239,53 @@ class _SourceSelectionScreenState extends State<SourceSelectionScreen>
           ),
         );
       }
+    } else if (source == AnimeSource.animeDrive &&
+        _animeDriveResults.isNotEmpty) {
+      // Seleciona AnimeDrive
+      if (_animeDriveResults.length > 1) {
+        final selectedShow = await _showVersionSelectionDialog(
+          source: source,
+          animeDriveShows: _animeDriveResults,
+        );
+        if (selectedShow == null) return;
+
+        final anime = Anime(
+          name: selectedShow.title,
+          url: selectedShow.url,
+          fallbackImageUrl: selectedShow.thumbnail ?? widget.imageUrl,
+          source: AnimeSource.animeDrive,
+          animeDriveId: selectedShow.id,
+        );
+
+        await AnimeService.enrichAnimeWithAniList(anime);
+
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ModernEpisodeListScreen(anime: anime),
+          ),
+        );
+      } else {
+        final show = _animeDriveResults.first;
+        final anime = Anime(
+          name: show.title,
+          url: show.url,
+          fallbackImageUrl: show.thumbnail ?? widget.imageUrl,
+          source: AnimeSource.animeDrive,
+          animeDriveId: show.id,
+        );
+
+        await AnimeService.enrichAnimeWithAniList(anime);
+
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ModernEpisodeListScreen(anime: anime),
+          ),
+        );
+      }
     } else {
       // Fallback (não deveria acontecer)
       final anime = Anime(
@@ -230,8 +312,18 @@ class _SourceSelectionScreenState extends State<SourceSelectionScreen>
     required AnimeSource source,
     List<AllAnimeShow>? allAnimeShows,
     List<Anime>? animeFireAnimes,
+    List<AnimeDriveShow>? animeDriveShows,
   }) async {
     final l10n = AppLocalizations.of(context);
+
+    int itemCount;
+    if (source == AnimeSource.allAnime) {
+      itemCount = allAnimeShows?.length ?? 0;
+    } else if (source == AnimeSource.animeDrive) {
+      itemCount = animeDriveShows?.length ?? 0;
+    } else {
+      itemCount = animeFireAnimes?.length ?? 0;
+    }
 
     return showDialog(
       context: context,
@@ -248,9 +340,7 @@ class _SourceSelectionScreenState extends State<SourceSelectionScreen>
             width: double.maxFinite,
             child: ListView.builder(
               shrinkWrap: true,
-              itemCount: source == AnimeSource.allAnime
-                  ? (allAnimeShows?.length ?? 0)
-                  : (animeFireAnimes?.length ?? 0),
+              itemCount: itemCount,
               itemBuilder: (context, index) {
                 if (source == AnimeSource.allAnime && allAnimeShows != null) {
                   final show = allAnimeShows[index];
@@ -264,6 +354,19 @@ class _SourceSelectionScreenState extends State<SourceSelectionScreen>
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.7),
                       ),
+                    ),
+                    trailing: const Icon(
+                      Icons.arrow_forward_ios,
+                      color: AppColors.primary,
+                    ),
+                    onTap: () => Navigator.pop(context, show),
+                  );
+                } else if (source == AnimeSource.animeDrive && animeDriveShows != null) {
+                  final show = animeDriveShows[index];
+                  return ListTile(
+                    title: Text(
+                      show.title,
+                      style: const TextStyle(color: Colors.white),
                     ),
                     trailing: const Icon(
                       Icons.arrow_forward_ios,
@@ -338,6 +441,9 @@ class _SourceSelectionScreenState extends State<SourceSelectionScreen>
                   CachedNetworkImage(
                     imageUrl: widget.imageUrl,
                     fit: BoxFit.cover,
+                    memCacheWidth: 800,
+                    memCacheHeight: 1200,
+                    filterQuality: FilterQuality.high,
                     placeholder: (context, url) =>
                         Container(color: AppColors.surface),
                     errorWidget: (context, url, error) => Container(
@@ -446,6 +552,29 @@ class _SourceSelectionScreenState extends State<SourceSelectionScreen>
                     isLoading: _isSearchingAnimeFire,
                     onTap: _animeFireResults.isNotEmpty
                         ? () => _selectSource(AnimeSource.animeFire)
+                        : null,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Opção AnimeDrive (MP4 direto)
+                  _buildSourceCard(
+                    title: 'AnimeDrive',
+                    subtitle: _isSearchingAnimeDrive
+                        ? l10n.searching
+                        : _animeDriveResults.isNotEmpty
+                        ? _animeDriveResults.length > 1
+                              ? 'Available • ${_animeDriveResults.length} versions found'
+                              : 'Available • Direct MP4'
+                        : _animeDriveErrorMessage ?? 'Unavailable',
+                    icon: Icons.play_circle_filled,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF00C853), Color(0xFF69F0AE)],
+                    ),
+                    available: _animeDriveResults.isNotEmpty,
+                    isLoading: _isSearchingAnimeDrive,
+                    onTap: _animeDriveResults.isNotEmpty
+                        ? () => _selectSource(AnimeSource.animeDrive)
                         : null,
                   ),
 

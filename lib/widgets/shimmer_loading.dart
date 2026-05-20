@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
-/// Widget de loading com efeito shimmer
-/// Substitui CircularProgressIndicator por uma animação mais elegante
+/// Widget de loading com efeito shimmer premium
+/// Animação suave com gradiente deslizante e efeito de brilho
 class ShimmerLoading extends StatefulWidget {
   final double width;
   final double height;
   final BorderRadius? borderRadius;
+  final bool enablePulse;
 
   const ShimmerLoading({
     super.key,
     required this.width,
     required this.height,
     this.borderRadius,
+    this.enablePulse = true,
   });
 
   @override
@@ -20,49 +22,77 @@ class ShimmerLoading extends StatefulWidget {
 }
 
 class _ShimmerLoadingState extends State<ShimmerLoading>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
+    with TickerProviderStateMixin {
+  late AnimationController _slideController;
+  late AnimationController _pulseController;
+  late Animation<double> _slideAnimation;
+  late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+    
+    // Slide animation - wave effect
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 1800),
       vsync: this,
     )..repeat();
     
-    _animation = Tween<double>(begin: -2, end: 2).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
+    _slideAnimation = Tween<double>(begin: -1.5, end: 2.5).animate(
+      CurvedAnimation(parent: _slideController, curve: Curves.easeInOutCubic),
+    );
+    
+    // Pulse animation - breathing effect
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    )..repeat(reverse: true);
+    
+    _pulseAnimation = Tween<double>(begin: 0.4, end: 0.7).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _slideController.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _animation,
+      animation: Listenable.merge([_slideAnimation, _pulseAnimation]),
       builder: (context, child) {
         return Container(
           width: widget.width,
           height: widget.height,
           decoration: BoxDecoration(
-            borderRadius: widget.borderRadius ?? BorderRadius.circular(12),
+            borderRadius: widget.borderRadius ?? BorderRadius.circular(16),
             gradient: LinearGradient(
-              begin: Alignment(_animation.value - 1, 0),
-              end: Alignment(_animation.value + 1, 0),
-              colors: const [
+              begin: Alignment(_slideAnimation.value - 1, -0.3),
+              end: Alignment(_slideAnimation.value + 1, 0.3),
+              colors: [
                 AppColors.surface,
-                AppColors.surfaceLight,
+                Color.lerp(
+                  AppColors.surfaceLight,
+                  AppColors.primary.withValues(alpha: 0.15),
+                  widget.enablePulse ? _pulseAnimation.value : 0.5,
+                )!,
                 AppColors.surface,
               ],
               stops: const [0.0, 0.5, 1.0],
             ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(
+                  alpha: widget.enablePulse ? _pulseAnimation.value * 0.1 : 0.05,
+                ),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
         );
       },

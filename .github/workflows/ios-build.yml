@@ -1,0 +1,66 @@
+name: iOS Build (unsigned .ipa)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: Build unsigned IPA
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Create .env from secret (optional)
+        run: |
+          if [ -n "${{ secrets.DOTENV }}" ]; then
+            printf '%s' "${{ secrets.DOTENV }}" > .env
+          else
+            cp .env.example .env
+          fi
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Flutter analyze
+        run: flutter analyze --no-fatal-infos
+        continue-on-error: true
+
+      - name: Build iOS (no codesign)
+        run: |
+          flutter build ios --release --no-codesign --verbose
+
+      - name: Package unsigned .ipa
+        run: |
+          set -euo pipefail
+          APP_PATH="build/ios/iphoneos/Runner.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Runner.app not found at $APP_PATH"
+            find build -name "Runner.app" -type d || true
+            exit 1
+          fi
+          PAYLOAD_DIR="build/ios/iphoneos/Payload"
+          mkdir -p "$PAYLOAD_DIR"
+          cp -R "$APP_PATH" "$PAYLOAD_DIR/Runner.app"
+          (cd build/ios/iphoneos && zip -qr goanime-unsigned.ipa Payload)
+          ls -lh build/ios/iphoneos/goanime-unsigned.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: goanime-ios-unsigned-ipa
+          path: build/ios/iphoneos/goanime-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14

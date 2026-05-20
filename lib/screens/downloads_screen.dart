@@ -40,29 +40,84 @@ class _DownloadsScreenState extends State<DownloadsScreen>
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
-        title: const Text(
-          'Downloads',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.accent, AppColors.accent.withValues(alpha: 0.7)],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.accent.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.download_rounded, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Downloads',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings, color: AppColors.textPrimary),
-            onPressed: () => _showSettingsDialog(context),
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.settings_outlined, color: AppColors.textPrimary),
+              onPressed: () => _showSettingsDialog(context),
+            ),
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppColors.accent,
-          labelColor: AppColors.accent,
-          unselectedLabelColor: AppColors.textSecondary,
-          tabs: const [
-            Tab(text: 'Active'),
-            Tab(text: 'Completed'),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56),
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicator: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.accent, AppColors.accent.withValues(alpha: 0.8)],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.accent.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              indicatorSize: TabBarIndicatorSize.tab,
+              indicatorPadding: const EdgeInsets.all(4),
+              dividerColor: Colors.transparent,
+              labelColor: Colors.white,
+              unselectedLabelColor: AppColors.textSecondary,
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+              tabs: const [
+                Tab(text: 'Ativos'),
+                Tab(text: 'Completos'),
+              ],
+            ),
+          ),
         ),
       ),
       body: TabBarView(
@@ -232,98 +287,206 @@ class _CompletedDownloadsTab extends StatelessWidget {
   }
 }
 
-/// Download card widget
-class _DownloadCard extends StatelessWidget {
+/// Download card widget com animações modernas
+class _DownloadCard extends StatefulWidget {
   final DownloadItem download;
   final bool isActive;
 
   const _DownloadCard({required this.download, required this.isActive});
 
   @override
+  State<_DownloadCard> createState() => _DownloadCardState();
+}
+
+class _DownloadCardState extends State<_DownloadCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _progressController;
+  bool _isPressed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _progressController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    if (widget.download.status == DownloadStatus.downloading) {
+      _progressController.repeat();
+    }
+  }
+
+  @override
+  void didUpdateWidget(_DownloadCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.download.status == DownloadStatus.downloading) {
+      if (!_progressController.isAnimating) {
+        _progressController.repeat();
+      }
+    } else {
+      _progressController.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _progressController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final downloadService = context.read<DownloadService>();
 
-    return Card(
-      color: AppColors.surface,
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            // Thumbnail
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: CachedNetworkImage(
-                imageUrl: download.thumbnailUrl,
-                width: 80,
-                height: 120,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Container(
-                  color: AppColors.surface,
-                  child: const Center(child: CircularProgressIndicator()),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  color: AppColors.surface,
-                  child: const Icon(Icons.error),
-                ),
-              ),
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: AnimatedScale(
+        scale: _isPressed ? 0.98 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: _getStatusColor(widget.download.status).withValues(alpha: 0.3),
+              width: 1.5,
             ),
-            const SizedBox(width: 12),
-            // Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    download.animeName,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Episode ${download.episodeNumber}',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 14,
-                    ),
-                  ),
-                  if (isActive) ...[
-                    const SizedBox(height: 8),
-                    // Progress bar
-                    LinearProgressIndicator(
-                      value: download.progress,
-                      backgroundColor: AppColors.background,
-                      valueColor: const AlwaysStoppedAnimation(
-                        AppColors.accent,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    // Status text
-                    Text(
-                      _getStatusText(download, downloadService),
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ],
+            boxShadow: [
+              BoxShadow(
+                color: _getStatusColor(widget.download.status).withValues(alpha: 0.1),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      // Thumbnail com badge de status
+                      Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: CachedNetworkImage(
+                              imageUrl: widget.download.thumbnailUrl,
+                              width: 75,
+                              height: 110,
+                              fit: BoxFit.cover,
+                              memCacheWidth: 225,
+                              memCacheHeight: 330,
+                              filterQuality: FilterQuality.high,
+                              placeholder: (context, url) => Container(
+                                color: AppColors.background,
+                                child: const Center(
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                color: AppColors.background,
+                                child: const Icon(Icons.error, color: Colors.white54),
+                              ),
+                            ),
+                          ),
+                          // Status badge
+                          Positioned(
+                            top: 6,
+                            right: 6,
+                            child: _StatusBadge(status: widget.download.status),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 14),
+                      // Info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.download.animeName,
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.accent.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'EP ${widget.download.episodeNumber}',
+                                style: TextStyle(
+                                  color: AppColors.accent,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            if (widget.isActive) ...[
+                              const SizedBox(height: 10),
+                              // Status text
+                              Text(
+                                _getStatusText(widget.download, downloadService),
+                                style: TextStyle(
+                                  color: _getStatusColor(widget.download.status),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      // Action buttons
+                      if (widget.isActive)
+                        _buildActiveActions(context, widget.download, downloadService)
+                      else
+                        _buildCompletedActions(context, widget.download, downloadService),
+                    ],
+                  ),
+                ),
+                // Animated progress bar
+                if (widget.isActive && widget.download.status == DownloadStatus.downloading)
+                  _AnimatedProgressBar(progress: widget.download.progress),
+              ],
             ),
-            // Action buttons
-            if (isActive)
-              _buildActiveActions(context, download, downloadService)
-            else
-              _buildCompletedActions(context, download, downloadService),
-          ],
+          ),
         ),
       ),
     );
+  }
+
+  Color _getStatusColor(DownloadStatus status) {
+    switch (status) {
+      case DownloadStatus.downloading:
+        return AppColors.accent;
+      case DownloadStatus.completed:
+        return Colors.green;
+      case DownloadStatus.paused:
+        return Colors.orange;
+      case DownloadStatus.failed:
+        return Colors.red;
+      case DownloadStatus.queued:
+        return AppColors.textSecondary;
+      case DownloadStatus.cancelled:
+        return Colors.grey;
+    }
   }
 
   Widget _buildActiveActions(
@@ -471,6 +634,9 @@ class _AnimeDownloadGroupState extends State<_AnimeDownloadGroup> {
                       width: 60,
                       height: 90,
                       fit: BoxFit.cover,
+                      memCacheWidth: 180,
+                      memCacheHeight: 270,
+                      filterQuality: FilterQuality.high,
                       placeholder: (context, url) => Container(
                         color: AppColors.background,
                         child: const Center(child: CircularProgressIndicator()),
@@ -743,6 +909,182 @@ class _LocalVideoPlayerScreenState extends State<_LocalVideoPlayerScreen> {
             : _isInitialized && _chewieController != null
             ? Chewie(controller: _chewieController!)
             : const CircularProgressIndicator(),
+      ),
+    );
+  }
+}
+
+/// Badge de status animado
+class _StatusBadge extends StatefulWidget {
+  final DownloadStatus status;
+
+  const _StatusBadge({required this.status});
+
+  @override
+  State<_StatusBadge> createState() => _StatusBadgeState();
+}
+
+class _StatusBadgeState extends State<_StatusBadge>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    if (widget.status == DownloadStatus.downloading) {
+      _controller.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(_StatusBadge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.status == DownloadStatus.downloading) {
+      _controller.repeat(reverse: true);
+    } else {
+      _controller.stop();
+      _controller.value = 1.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final (color, icon) = _getStatusInfo();
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) => Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(6),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(
+                alpha: widget.status == DownloadStatus.downloading
+                    ? 0.3 + (_controller.value * 0.3)
+                    : 0.3,
+              ),
+              blurRadius: 8,
+              spreadRadius: widget.status == DownloadStatus.downloading
+                  ? _controller.value * 2
+                  : 0,
+            ),
+          ],
+        ),
+        child: Icon(icon, color: Colors.white, size: 12),
+      ),
+    );
+  }
+
+  (Color, IconData) _getStatusInfo() {
+    switch (widget.status) {
+      case DownloadStatus.downloading:
+        return (AppColors.accent, Icons.downloading);
+      case DownloadStatus.completed:
+        return (Colors.green, Icons.check);
+      case DownloadStatus.paused:
+        return (Colors.orange, Icons.pause);
+      case DownloadStatus.failed:
+        return (Colors.red, Icons.error);
+      case DownloadStatus.queued:
+        return (AppColors.textSecondary, Icons.schedule);
+      case DownloadStatus.cancelled:
+        return (Colors.grey, Icons.cancel);
+    }
+  }
+}
+
+/// Barra de progresso animada
+class _AnimatedProgressBar extends StatefulWidget {
+  final double progress;
+
+  const _AnimatedProgressBar({required this.progress});
+
+  @override
+  State<_AnimatedProgressBar> createState() => _AnimatedProgressBarState();
+}
+
+class _AnimatedProgressBarState extends State<_AnimatedProgressBar>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _shimmerController;
+
+  @override
+  void initState() {
+    super.initState();
+    _shimmerController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _shimmerController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 4,
+      decoration: BoxDecoration(
+        color: AppColors.background,
+      ),
+      child: AnimatedBuilder(
+        animation: _shimmerController,
+        builder: (context, child) => Stack(
+          children: [
+            // Progress fill
+            FractionallySizedBox(
+              widthFactor: widget.progress.clamp(0.0, 1.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.accent,
+                      AppColors.accent.withValues(alpha: 0.8),
+                      AppColors.accent,
+                    ],
+                    stops: [
+                      0.0,
+                      _shimmerController.value,
+                      1.0,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Shimmer effect
+            if (widget.progress > 0 && widget.progress < 1)
+              Positioned(
+                left: (MediaQuery.of(context).size.width * widget.progress) - 20,
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.transparent,
+                        Colors.white.withValues(alpha: 0.4),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

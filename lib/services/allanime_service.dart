@@ -399,9 +399,11 @@ class AllAnimeService {
     }
   }
 
-  /// Extrai link de vídeo da URL de fonte
-  static Future<String?> _getVideoLink(String sourceURL) async {
+  /// Extrai link de vídeo da URL de fonte (prioriza MP4 para download)
+  static Future<String?> _getVideoLink(String sourceURL, {bool preferMp4 = false}) async {
     try {
+      debugPrint('[AllAnime] Fetching video link from: $sourceURL');
+      
       final response = await http
           .get(
             Uri.parse(sourceURL),
@@ -415,9 +417,29 @@ class AllAnimeService {
         // Buscar por links no formato JSON
         if (data['links'] != null) {
           final links = data['links'] as List;
+          
+          // Se preferMp4, tentar encontrar link MP4 primeiro
+          if (preferMp4) {
+            for (final link in links) {
+              final videoLink = link['link'] as String?;
+              final linkType = link['type'] as String? ?? '';
+              final resolutionStr = link['resolutionStr'] as String? ?? '';
+              
+              if (videoLink != null && 
+                  (videoLink.contains('.mp4') || 
+                   linkType.toLowerCase().contains('mp4') ||
+                   !videoLink.contains('.m3u8'))) {
+                debugPrint('[AllAnime] Found MP4 link: $videoLink ($resolutionStr)');
+                return videoLink.replaceAll(r'\', '');
+              }
+            }
+          }
+          
+          // Fallback para qualquer link disponível
           for (final link in links) {
             final videoLink = link['link'] as String?;
             if (videoLink != null) {
+              debugPrint('[AllAnime] Using link: $videoLink');
               return videoLink.replaceAll(r'\', '');
             }
           }
@@ -427,6 +449,77 @@ class AllAnimeService {
       debugPrint('[AllAnime] Get video link error: $e');
     }
     return null;
+  }
+  
+  /// Busca URL do episódio para download (prioriza MP4)
+  static Future<String?> getEpisodeDownloadURL(
+    String animeId,
+    String episodeNo, {
+    String mode = 'sub',
+  }) async {
+    try {
+      debugPrint(
+        '[AllAnime] Getting download URL: $animeId - Episode $episodeNo',
+      );
+
+      const episodeEmbedGQL = '''
+        query (\$showId: String!, \$translationType: VaildTranslationTypeEnumType!, \$episodeString: String!) {
+          episode(showId: \$showId, translationType: \$translationType, episodeString: \$episodeString) {
+            episodeString
+            sourceUrls
+          }
+        }
+      ''';
+
+      final variables = jsonEncode({
+        'showId': animeId,
+        'translationType': mode,
+        'episodeString': episodeNo,
+      });
+
+      final url = Uri.parse(
+        '$_allAnimeAPI?variables=${Uri.encodeComponent(variables)}&query=${Uri.encodeComponent(episodeEmbedGQL)}',
+      );
+
+      final response = await http
+          .get(
+            url,
+            headers: {'User-Agent': _userAgent, 'Referer': _allAnimeReferer},
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final sourceURLs = _extractSourceURLs(data);
+        debugPrint('[AllAnime] Found ${sourceURLs.length} source URLs');
+
+        if (sourceURLs.isNotEmpty) {
+          // Primeira passada: tentar encontrar MP4
+          for (final sourceURL in sourceURLs) {
+            final videoURL = await _getVideoLink(sourceURL, preferMp4: true);
+            if (videoURL != null && !videoURL.contains('.m3u8')) {
+              debugPrint('[AllAnime] Found downloadable MP4: $videoURL');
+              return videoURL;
+            }
+          }
+          
+          // Segunda passada: usar qualquer link
+          for (final sourceURL in sourceURLs) {
+            final videoURL = await _getVideoLink(sourceURL, preferMp4: false);
+            if (videoURL != null) {
+              debugPrint('[AllAnime] Found video URL (may be HLS): $videoURL');
+              return videoURL;
+            }
+          }
+        }
+      }
+
+      debugPrint('[AllAnime] No download URL found');
+      return null;
+    } catch (e) {
+      debugPrint('[AllAnime] Get download URL error: $e');
+      return null;
+    }
   }
 }
 

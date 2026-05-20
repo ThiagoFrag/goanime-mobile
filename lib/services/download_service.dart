@@ -184,7 +184,7 @@ class DownloadService extends ChangeNotifier {
 
     return await openDatabase(
       dbPath,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE downloads (
@@ -206,6 +206,27 @@ class DownloadService extends ChangeNotifier {
             completedAt INTEGER
           )
         ''');
+        await db.execute(
+          'CREATE INDEX idx_downloads_animeId ON downloads(animeId)',
+        );
+        await db.execute(
+          'CREATE INDEX idx_downloads_status ON downloads(status)',
+        );
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          // Add indices introduced in v2; ignore failures if they exist.
+          try {
+            await db.execute(
+              'CREATE INDEX IF NOT EXISTS idx_downloads_animeId ON downloads(animeId)',
+            );
+            await db.execute(
+              'CREATE INDEX IF NOT EXISTS idx_downloads_status ON downloads(status)',
+            );
+          } catch (e) {
+            debugPrint('[DownloadService] migration v2 warning: $e');
+          }
+        }
       },
     );
   }
@@ -341,10 +362,11 @@ class DownloadService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Check if this is an AllAnime episode (videoUrl is just episode number)
+      // Check if this is an AllAnime episode (videoUrl is just episode number,
+      // possibly decimal like "12.5" for specials)
       final isAllAnimeEpisode =
           !download.videoUrl.startsWith('http') &&
-          int.tryParse(download.videoUrl) != null;
+          double.tryParse(download.videoUrl) != null;
 
       if (!isAllAnimeEpisode) {
         // Validate URL for AnimeFire - must be a full URL
@@ -400,13 +422,14 @@ class DownloadService extends ChangeNotifier {
     try {
       debugPrint('[Download] Resolving video URL...');
 
-      // Check if this is an AllAnime episode (videoUrl is just episode number)
+      // Check if this is an AllAnime episode (videoUrl is just episode number,
+      // possibly decimal like "12.5" for specials)
       final isAllAnimeEpisode =
           !download.videoUrl.startsWith('http') &&
-          int.tryParse(download.videoUrl) != null;
+          double.tryParse(download.videoUrl) != null;
 
       if (isAllAnimeEpisode) {
-        // AllAnime: use AllAnimeService to get video URL
+        // AllAnime: use AllAnimeService to get video URL (prefer MP4 for download)
         debugPrint(
           '[Download] Detected AllAnime episode, fetching video URL...',
         );
@@ -419,13 +442,23 @@ class DownloadService extends ChangeNotifier {
           '[Download] AllAnime Show ID: $animeShowId, Episode: $episodeNumber',
         );
 
-        final videoUrl = await AllAnimeService.getEpisodeURL(
+        // Tentar primeiro a URL de download (prioriza MP4)
+        var videoUrl = await AllAnimeService.getEpisodeDownloadURL(
           animeShowId,
           episodeNumber,
         );
+        
+        // Fallback para URL normal se não encontrou MP4
+        if (videoUrl == null || videoUrl.isEmpty) {
+          debugPrint('[Download] No direct MP4 found, trying regular URL...');
+          videoUrl = await AllAnimeService.getEpisodeURL(
+            animeShowId,
+            episodeNumber,
+          );
+        }
 
         if (videoUrl == null || videoUrl.isEmpty) {
-          throw Exception('Failed to get video URL from AllAnime');
+          throw Exception('Não foi possível obter URL do vídeo do AllAnime. Tente outra fonte.');
         }
 
         debugPrint('[Download] AllAnime video URL: $videoUrl');
@@ -433,7 +466,7 @@ class DownloadService extends ChangeNotifier {
         // Check if it's HLS
         if (videoUrl.contains('.m3u8') || videoUrl.contains('master.m3u8')) {
           throw Exception(
-            'AllAnime uses HLS streaming which cannot be downloaded. Try AnimeFire source instead.',
+            'Este episódio usa streaming HLS e não pode ser baixado diretamente. Tente a fonte AnimeFire.',
           );
         }
 

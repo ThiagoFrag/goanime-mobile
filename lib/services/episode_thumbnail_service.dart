@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 /// Service to fetch episode-specific thumbnails from multiple sources
 class EpisodeThumbnailService {
-  static const String _tmdbApiKey =
-      '6c71a5457f310ab5f5464cf8bb67d365'; // Public TMDB API key
+  static String get _tmdbApiKey => dotenv.env['TMDB_API_KEY'] ?? '';
   static const String _tmdbApiBase = 'https://api.themoviedb.org/3';
   static const String _tmdbImageBase = 'https://image.tmdb.org/t/p/w500';
   static const String _kitsuApiBase = 'https://kitsu.io/api/edge';
@@ -46,6 +46,10 @@ class EpisodeThumbnailService {
     String animeTitle,
     int episodeNumber,
   ) async {
+    if (_tmdbApiKey.isEmpty) {
+      debugPrint('[EpisodeThumbnail] TMDB_API_KEY not configured, skipping TMDB');
+      return null;
+    }
     try {
       // Clean the anime title
       final cleanTitle = animeTitle
@@ -493,6 +497,10 @@ class EpisodeThumbnailService {
     List<int> episodeNumbers,
   ) async {
     final Map<int, String> thumbnails = {};
+    if (_tmdbApiKey.isEmpty) {
+      debugPrint('[EpisodeThumbnail] TMDB_API_KEY not configured, skipping batch');
+      return thumbnails;
+    }
 
     try {
       // Clean the anime title

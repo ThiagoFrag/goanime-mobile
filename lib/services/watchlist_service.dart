@@ -19,7 +19,7 @@ class WatchlistService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE $tableName (
@@ -31,6 +31,20 @@ class WatchlistService {
             addedAt TEXT NOT NULL
           )
         ''');
+        await db.execute(
+          'CREATE INDEX idx_${tableName}_addedAt ON $tableName(addedAt)',
+        );
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          try {
+            await db.execute(
+              'CREATE INDEX IF NOT EXISTS idx_${tableName}_addedAt ON $tableName(addedAt)',
+            );
+          } catch (e) {
+            debugPrint('[WatchlistService] migration v2 warning: $e');
+          }
+        }
       },
     );
   }

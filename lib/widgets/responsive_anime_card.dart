@@ -82,9 +82,9 @@ class _ResponsiveAnimeCardState extends State<ResponsiveAnimeCard> {
                         CachedNetworkImage(
                           imageUrl: widget.anime.largImageUrl ?? widget.anime.imageUrl,
                           fit: BoxFit.cover,
-                          filterQuality: FilterQuality.medium,
-                          memCacheWidth: (cardWidth * 2).toInt(),
-                          memCacheHeight: (cardHeight * 2).toInt(),
+                          filterQuality: FilterQuality.high,
+                          memCacheWidth: (cardWidth * 3).toInt(),
+                          memCacheHeight: (cardHeight * 3).toInt(),
                           placeholder: (context, url) => Container(
                             color: AppColors.surface,
                             child: const Center(

@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import '../main.dart';
 import 'video_player_screen.dart';
+import 'desktop_video_player_screen.dart';
+import 'android_webview_player_screen.dart';
 import '../theme/app_colors.dart';
 import '../widgets/download_button.dart';
 import '../services/download_service.dart';
@@ -127,14 +130,38 @@ class _ModernEpisodeListScreenState extends State<ModernEpisodeListScreen>
       'AniList ID: ${widget.anime.anilistId}, '
       'MAL ID: ${widget.anime.malId}',
     );
+    
+    // Use desktop player for Windows/Linux/macOS
+    final isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    // Use WebView player for Android (more compatible with HLS sources)
+    final isAndroid = Platform.isAndroid;
+    
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ModernVideoPlayerScreen(
-          anime: widget.anime,
-          episode: episode,
-          animeTitle: widget.anime.name,
-        ),
+        builder: (context) {
+          if (isDesktop) {
+            return DesktopVideoPlayerScreen(
+              anime: widget.anime,
+              episode: episode,
+              animeTitle: widget.anime.name,
+            );
+          } else if (isAndroid) {
+            // Use WebView player for Android - more compatible
+            return AndroidWebViewPlayerScreen(
+              anime: widget.anime,
+              episode: episode,
+              animeTitle: widget.anime.name,
+            );
+          } else {
+            // iOS uses native player
+            return ModernVideoPlayerScreen(
+              anime: widget.anime,
+              episode: episode,
+              animeTitle: widget.anime.name,
+            );
+          }
+        },
       ),
     );
   }
@@ -217,6 +244,9 @@ class _ModernEpisodeListScreenState extends State<ModernEpisodeListScreen>
               CachedNetworkImage(
                 imageUrl: widget.anime.bannerUrl,
                 fit: BoxFit.cover,
+                memCacheWidth: 1200,
+                memCacheHeight: 600,
+                filterQuality: FilterQuality.high,
                 placeholder: (context, url) =>
                     Container(color: const Color(0xFF1A1A2E)),
                 errorWidget: (context, url, error) =>
@@ -226,6 +256,9 @@ class _ModernEpisodeListScreenState extends State<ModernEpisodeListScreen>
               CachedNetworkImage(
                 imageUrl: widget.anime.imageUrl,
                 fit: BoxFit.cover,
+                memCacheWidth: 600,
+                memCacheHeight: 900,
+                filterQuality: FilterQuality.high,
                 placeholder: (context, url) =>
                     Container(color: const Color(0xFF1A1A2E)),
                 errorWidget: (context, url, error) =>

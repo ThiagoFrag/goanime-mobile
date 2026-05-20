@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/aniskip_models.dart';
@@ -137,7 +138,7 @@ class AniSkipService {
 
   /// Rounds a time value to the specified precision
   static double roundTime(double timeValue, int precision) {
-    final multiplier = 1.0 * (10 ^ precision);
+    final multiplier = math.pow(10, precision).toDouble();
     return (timeValue * multiplier).round() / multiplier;
   }
 }

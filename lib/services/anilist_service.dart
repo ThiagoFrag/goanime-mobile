@@ -69,7 +69,13 @@ class AniListService {
         return null;
       }
 
-      final aniListResponse = AniListResponse.fromJson(jsonResponse);
+      final AniListResponse aniListResponse;
+      try {
+        aniListResponse = AniListResponse.fromJson(jsonResponse);
+      } on FormatException catch (e) {
+        debugPrint('[AniList] Malformed response: $e');
+        return null;
+      }
 
       debugPrint(
         '[AniList] Success: ID ${aniListResponse.data.media.id}, '

@@ -6,9 +6,11 @@ class AniListResponse {
   AniListResponse({required this.data});
 
   factory AniListResponse.fromJson(Map<String, dynamic> json) {
-    return AniListResponse(
-      data: MediaData.fromJson(json['data'] as Map<String, dynamic>),
-    );
+    final rawData = json['data'];
+    if (rawData is! Map<String, dynamic>) {
+      throw const FormatException('AniList response missing "data" object');
+    }
+    return AniListResponse(data: MediaData.fromJson(rawData));
   }
 }
 
@@ -18,9 +20,11 @@ class MediaData {
   MediaData({required this.media});
 
   factory MediaData.fromJson(Map<String, dynamic> json) {
-    return MediaData(
-      media: MediaDetails.fromJson(json['Media'] as Map<String, dynamic>),
-    );
+    final rawMedia = json['Media'];
+    if (rawMedia is! Map<String, dynamic>) {
+      throw const FormatException('AniList response missing "Media" object');
+    }
+    return MediaData(media: MediaDetails.fromJson(rawMedia));
   }
 }
 

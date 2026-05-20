@@ -296,8 +296,13 @@ class _GenreAnimesScreenState extends State<GenreAnimesScreen> {
             children: [
               // Imagem
               CachedNetworkImage(
-                imageUrl: anime.imageUrl,
+                imageUrl: anime.largImageUrl ?? anime.imageUrl,
                 fit: BoxFit.cover,
+                memCacheWidth: 400,
+                memCacheHeight: 600,
+                maxWidthDiskCache: 800,
+                maxHeightDiskCache: 1200,
+                filterQuality: FilterQuality.high,
                 placeholder: (context, url) => Container(
                   color: AppColors.surface,
                   child: const Center(

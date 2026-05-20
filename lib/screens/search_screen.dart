@@ -3,16 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/jikan_models.dart';
 import '../services/jikan_service.dart';
+import '../services/gomang_service.dart';
 import '../services/search_history_service.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_colors.dart';
 import '../utils/responsive.dart';
 import 'source_selection_screen.dart';
+import 'manga_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   final VoidCallback? onBackPressed;
+  final bool isMangaMode;
 
-  const SearchScreen({super.key, this.onBackPressed});
+  const SearchScreen({super.key, this.onBackPressed, this.isMangaMode = false});
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -22,6 +25,7 @@ class _SearchScreenState extends State<SearchScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   final JikanService _jikanService = JikanService();
+  final GomangService _gomangService = GomangService();
   final FocusNode _searchFocusNode = FocusNode();
 
   late AnimationController _animationController;
@@ -32,6 +36,8 @@ class _SearchScreenState extends State<SearchScreen>
   List<JikanAnime> _trendingAnimes = [];
   List<JikanAnime> _searchResults = [];
   List<JikanAnime> _recentSearchResults = [];
+  List<Map<String, dynamic>> _mangaResults = [];
+  List<Map<String, dynamic>> _trendingMangas = [];
 
   bool _isLoadingTrending = true;
   bool _isSearching = false;
@@ -108,8 +114,12 @@ class _SearchScreenState extends State<SearchScreen>
     _animationController.forward();
 
     _loadSearchHistory();
-    _loadTrendingAnimes();
-    _loadRecentSearches();
+    if (widget.isMangaMode) {
+      _loadTrendingMangas();
+    } else {
+      _loadTrendingAnimes();
+      _loadRecentSearches();
+    }
 
     _searchController.addListener(_onSearchChanged);
   }
@@ -133,6 +143,7 @@ class _SearchScreenState extends State<SearchScreen>
         _showHistory = true;
         _suggestions = [];
         _searchResults = [];
+        _mangaResults = [];
       });
       return;
     }
@@ -174,6 +185,22 @@ class _SearchScreenState extends State<SearchScreen>
     }
   }
 
+  Future<void> _loadTrendingMangas() async {
+    setState(() => _isLoadingTrending = true);
+    try {
+      final mangas = await _gomangService.getPopular();
+      if (mounted) {
+        setState(() {
+          _trendingMangas = mangas.cast<Map<String, dynamic>>();
+          _isLoadingTrending = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading trending mangas: $e');
+      if (mounted) setState(() => _isLoadingTrending = false);
+    }
+  }
+
   Future<void> _loadRecentSearches() async {
     final history = await SearchHistoryService.getSearchHistory();
     if (history.isEmpty) return;
@@ -205,27 +232,35 @@ class _SearchScreenState extends State<SearchScreen>
     setState(() => _isSearching = true);
 
     try {
-      List<JikanAnime> results;
-
-      if (_selectedGenre != null) {
-        // Busca por gênero com termo
-        results = await _jikanService.searchAnimes(query, limit: 20);
-        results = results.where((anime) {
-          return anime.genres.any((genre) => genre.malId == _selectedGenre);
-        }).toList();
+      if (widget.isMangaMode) {
+        // Busca de mangás
+        final results = await _gomangService.search(query);
+        if (mounted) {
+          setState(() {
+            _mangaResults = results.cast<Map<String, dynamic>>();
+            _isSearching = false;
+          });
+        }
       } else {
-        // Busca normal
-        results = await _jikanService.searchAnimes(query, limit: 20);
-      }
-
-      if (mounted) {
-        setState(() {
-          _searchResults = results;
-          _isSearching = false;
-        });
+        // Busca de animes
+        List<JikanAnime> results;
+        if (_selectedGenre != null) {
+          results = await _jikanService.searchAnimes(query, limit: 20);
+          results = results.where((anime) {
+            return anime.genres.any((genre) => genre.malId == _selectedGenre);
+          }).toList();
+        } else {
+          results = await _jikanService.searchAnimes(query, limit: 20);
+        }
+        if (mounted) {
+          setState(() {
+            _searchResults = results;
+            _isSearching = false;
+          });
+        }
       }
     } catch (e) {
-      debugPrint('Error searching animes: $e');
+      debugPrint('Error searching: $e');
       if (mounted) setState(() => _isSearching = false);
     }
   }
@@ -281,6 +316,15 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
+  void _onMangaTap(Map<String, dynamic> manga) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MangaDetailScreen(manga: manga),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.canPop(context);
@@ -293,8 +337,8 @@ class _SearchScreenState extends State<SearchScreen>
             // Search Header
             _buildSearchHeader(canPop),
 
-            // Genre Filters
-            if (!_showHistory) _buildGenreFilters(),
+            // Genre Filters (only for anime mode)
+            if (!_showHistory && !widget.isMangaMode) _buildGenreFilters(),
 
             // Content
             Expanded(
@@ -309,13 +353,23 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   Widget _buildSearchHeader(bool canPop) {
+    final isVR = Responsive.isQuest(context);
+    final horizontalPadding = Responsive.getHorizontalPadding(context);
+    final borderRadius = Responsive.getBorderRadius(context);
+    final iconSize = Responsive.getIconSize(context);
+    final fontSize = Responsive.getFontSize(context);
+    final primaryColor = isVR ? AppColors.vrPrimary : AppColors.primary;
+    final surfaceColor = isVR ? AppColors.vrSurface : AppColors.surface;
+    
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isVR ? 24 : 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [AppColors.background, AppColors.backgroundLight],
+          colors: isVR 
+              ? [AppColors.vrSurface, AppColors.vrSurfaceLight]
+              : [AppColors.background, AppColors.backgroundLight],
         ),
       ),
       child: Column(
@@ -323,62 +377,89 @@ class _SearchScreenState extends State<SearchScreen>
           Row(
             children: [
               // Back button
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () {
-                  if (canPop) {
-                    Navigator.pop(context);
-                  } else if (widget.onBackPressed != null) {
-                    widget.onBackPressed!();
-                  }
-                },
+              Container(
+                decoration: isVR
+                    ? BoxDecoration(
+                        color: surfaceColor,
+                        borderRadius: BorderRadius.circular(borderRadius / 2),
+                        border: Border.all(
+                          color: AppColors.vrGlow.withValues(alpha: 0.2),
+                        ),
+                      )
+                    : null,
+                child: IconButton(
+                  icon: Icon(Icons.arrow_back, color: Colors.white, size: iconSize),
+                  padding: EdgeInsets.all(isVR ? 12 : 8),
+                  onPressed: () {
+                    if (canPop) {
+                      Navigator.pop(context);
+                    } else if (widget.onBackPressed != null) {
+                      widget.onBackPressed!();
+                    }
+                  },
+                ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: isVR ? 16 : 8),
 
               // Search field (otimizado - sem BackdropFilter)
               Expanded(
                 child: Container(
+                  constraints: BoxConstraints(minHeight: isVR ? 64 : 48),
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(16),
+                    color: surfaceColor,
+                    borderRadius: BorderRadius.circular(borderRadius),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.1),
-                      width: 1,
+                      color: isVR
+                          ? AppColors.vrGlow.withValues(alpha: 0.2)
+                          : Colors.white.withValues(alpha: 0.1),
+                      width: isVR ? 1.5 : 1,
                     ),
+                    boxShadow: isVR
+                        ? [
+                            BoxShadow(
+                              color: AppColors.vrGlow.withValues(alpha: 0.1),
+                              blurRadius: 12,
+                            ),
+                          ]
+                        : null,
                   ),
                   child: TextField(
                     controller: _searchController,
                     focusNode: _searchFocusNode,
                     autofocus: true,
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    style: TextStyle(color: Colors.white, fontSize: fontSize),
                     decoration: InputDecoration(
-                      hintText: 'Search animes...',
+                      hintText: widget.isMangaMode ? 'Buscar mangás...' : 'Search animes...',
                       hintStyle: TextStyle(
                         color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: fontSize,
                       ),
-                      prefixIcon: const Icon(
+                      prefixIcon: Icon(
                         Icons.search,
-                        color: AppColors.primary,
+                        color: primaryColor,
+                        size: iconSize,
                       ),
                       suffixIcon: _searchController.text.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(
+                              icon: Icon(
                                 Icons.clear,
                                 color: Colors.white70,
+                                size: iconSize,
                               ),
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() {
                                   _showHistory = true;
                                   _searchResults = [];
+                                  _mangaResults = [];
                                 });
                               },
                             )
                           : null,
                       border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: isVR ? 24 : 16,
+                        vertical: isVR ? 18 : 14,
                       ),
                     ),
                   ),
@@ -389,9 +470,9 @@ class _SearchScreenState extends State<SearchScreen>
 
           // Suggestions
           if (_suggestions.isNotEmpty) ...[
-            const SizedBox(height: 12),
+            SizedBox(height: isVR ? 16 : 12),
             SizedBox(
-              height: 40,
+              height: isVR ? 56 : 40,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: _suggestions.length,
@@ -480,8 +561,8 @@ class _SearchScreenState extends State<SearchScreen>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Recent Searches (with results)
-        if (_recentSearchResults.isNotEmpty) ...[
+        // Recent Searches (with results) - only for anime mode
+        if (!widget.isMangaMode && _recentSearchResults.isNotEmpty) ...[
           _buildSectionHeader('Recent Searches', Icons.history),
           const SizedBox(height: 16),
           SizedBox(
@@ -528,11 +609,29 @@ class _SearchScreenState extends State<SearchScreen>
         ],
 
         // Trending
-        _buildSectionHeader('Trending Now', Icons.local_fire_department),
+        _buildSectionHeader(
+          widget.isMangaMode ? 'Mangás Populares' : 'Trending Now',
+          Icons.local_fire_department,
+        ),
         const SizedBox(height: 16),
         if (_isLoadingTrending)
           const Center(
             child: CircularProgressIndicator(color: AppColors.primary),
+          )
+        else if (widget.isMangaMode)
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: Responsive.getGridColumns(context),
+              childAspectRatio: 0.6,
+              crossAxisSpacing: Responsive.getCardSpacing(context),
+              mainAxisSpacing: Responsive.getCardSpacing(context),
+            ),
+            itemCount: _trendingMangas.length,
+            itemBuilder: (context, index) {
+              return _buildGridMangaCard(_trendingMangas[index]);
+            },
           )
         else
           GridView.builder(
@@ -557,6 +656,45 @@ class _SearchScreenState extends State<SearchScreen>
     if (_isSearching) {
       return const Center(
         child: CircularProgressIndicator(color: AppColors.primary),
+      );
+    }
+
+    if (widget.isMangaMode) {
+      if (_mangaResults.isEmpty) {
+        final l10n = AppLocalizations.of(context);
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.search_off,
+                size: 64,
+                color: Colors.white.withValues(alpha: 0.3),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                l10n.noResultsFound,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      return GridView.builder(
+        padding: EdgeInsets.all(Responsive.getHorizontalPadding(context)),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: Responsive.getGridColumns(context),
+          childAspectRatio: 0.6,
+          crossAxisSpacing: Responsive.getCardSpacing(context),
+          mainAxisSpacing: Responsive.getCardSpacing(context),
+        ),
+        itemCount: _mangaResults.length,
+        itemBuilder: (context, index) {
+          return _buildGridMangaCard(_mangaResults[index]);
+        },
       );
     }
 
@@ -639,10 +777,13 @@ class _SearchScreenState extends State<SearchScreen>
               child: Stack(
                 children: [
                   CachedNetworkImage(
-                    imageUrl: anime.imageUrl,
+                    imageUrl: anime.largImageUrl ?? anime.imageUrl,
                     width: 130,
                     height: 160,
                     fit: BoxFit.cover,
+                    filterQuality: FilterQuality.high,
+                    memCacheWidth: 390,
+                    memCacheHeight: 480,
                     placeholder: (context, url) => Container(
                       color: AppColors.surface,
                       child: const Center(
@@ -718,10 +859,13 @@ class _SearchScreenState extends State<SearchScreen>
               child: Stack(
                 children: [
                   CachedNetworkImage(
-                    imageUrl: anime.imageUrl,
+                    imageUrl: anime.largImageUrl ?? anime.imageUrl,
                     width: double.infinity,
                     height: double.infinity,
                     fit: BoxFit.cover,
+                    filterQuality: FilterQuality.high,
+                    memCacheWidth: 450,
+                    memCacheHeight: 600,
                     placeholder: (context, url) => Container(
                       color: AppColors.surface,
                       child: const Center(
@@ -772,6 +916,55 @@ class _SearchScreenState extends State<SearchScreen>
           const SizedBox(height: 6),
           Text(
             anime.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              height: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGridMangaCard(Map<String, dynamic> manga) {
+    return GestureDetector(
+      onTap: () => _onMangaTap(manga),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: CachedNetworkImage(
+                imageUrl: manga['image'] ?? '',
+                width: double.infinity,
+                height: double.infinity,
+                fit: BoxFit.cover,
+                filterQuality: FilterQuality.high,
+                memCacheWidth: 450,
+                memCacheHeight: 600,
+                placeholder: (context, url) => Container(
+                  color: AppColors.surface,
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  color: AppColors.surface,
+                  child: const Icon(Icons.broken_image, color: Colors.white54),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            manga['title'] ?? '',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
