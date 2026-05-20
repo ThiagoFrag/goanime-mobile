@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:ionicons/ionicons.dart';
+import '../utils/icons_compat.dart';
 import '../theme/app_colors.dart';
 import '../utils/responsive.dart';
 import 'home_screen.dart';

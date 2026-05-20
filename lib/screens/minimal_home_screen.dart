@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:lucide_icons/lucide_icons.dart';
-import 'package:ionicons/ionicons.dart';
+import '../utils/icons_compat.dart';
 import 'package:provider/provider.dart';
 
 import '../models/jikan_models.dart';

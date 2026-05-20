@@ -62,10 +62,8 @@ dependencies:
   flutter_dotenv: ^5.1.0
   # Bottom navigation bar
   bottom_navy_bar: ^6.0.0
-  # Ionicons icons
-  ionicons: ^0.2.2
-  # Lucide icons
-  lucide_icons: ^0.257.0
+  # Note: ionicons/lucide_icons removed because they extend the now-final
+  # IconData class. Replacements live in lib/utils/icons_compat.dart.
   # Animated widgets
   animated_item: ^0.0.2
   # URL Launcher for external links

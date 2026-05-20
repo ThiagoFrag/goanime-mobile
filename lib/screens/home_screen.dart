@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:ionicons/ionicons.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import '../utils/icons_compat.dart';
 import '../models/jikan_models.dart';
 import '../services/jikan_service.dart';
 import '../services/gomang_service.dart';
