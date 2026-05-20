@@ -1,4 +1,5 @@
 import 'base_source.dart';
+import 'mangadex_source.dart';
 import 'mangalivre_blog_source.dart';
 import 'models.dart';
 
@@ -8,9 +9,10 @@ class MangaScraper {
   final List<String> _sourceOrder = [];
 
   MangaScraper() {
-    // Register default sources
+    // Register default sources. Ordem importa: a primeira é a default
+    // quando o usuário não escolhe explicitamente.
     registerSource(MangaLivreBlogSource());
-    // Can add more sources here in the future
+    registerSource(MangaDexSource(language: 'pt-br'));
   }
 
   /// Register a new source
@@ -35,6 +37,9 @@ class MangaScraper {
   String detectSourceFromUrl(String url) {
     final lowerUrl = url.toLowerCase();
 
+    if (lowerUrl.contains('mangadex.org') || lowerUrl.contains('mangadex.io')) {
+      return 'mangadex';
+    }
     if (lowerUrl.contains('mangalivre.blog')) {
       return 'mangalivre.blog';
     }

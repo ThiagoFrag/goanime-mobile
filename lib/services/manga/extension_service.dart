@@ -29,7 +29,7 @@ class ExtensionService extends ChangeNotifier {
   ];
 
   // Built-in sources (always available)
-  static const List<String> _builtInSources = ['mangalivre.blog'];
+  static const List<String> _builtInSources = ['mangalivre.blog', 'mangadex'];
 
   ExtensionService._();
 

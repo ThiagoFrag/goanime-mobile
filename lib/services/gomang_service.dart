@@ -45,6 +45,48 @@ class GomangService {
     }
   }
 
+  /// Popular agregado de todas as fontes registradas, com dedupe por título.
+  /// Útil pra UI que quer mostrar variedade máxima sem pedir a fonte ao user.
+  Future<List<Map<String, dynamic>>> getPopularAllSources({int pages = 2}) async {
+    final results = <Map<String, dynamic>>[];
+    final seenTitles = <String>{};
+    await Future.wait(_scraper.sources.map((srcName) async {
+      try {
+        final list = await getPopular(source: srcName, pages: pages);
+        for (final raw in list) {
+          if (raw is Map) {
+            final m = Map<String, dynamic>.from(raw);
+            final t = (m['title'] ?? '').toString().toLowerCase().trim();
+            if (t.isEmpty || !seenTitles.add(t)) continue;
+            results.add(m);
+          }
+        }
+      } catch (e) {
+        debugPrint('[GomangService] $srcName popular failed: $e');
+      }
+    }));
+    return results;
+  }
+
+  /// Latest agregado entre fontes.
+  Future<List<Map<String, dynamic>>> getLatestUpdatesAllSources() async {
+    final results = <Map<String, dynamic>>[];
+    final seenTitles = <String>{};
+    await Future.wait(_scraper.sources.map((srcName) async {
+      try {
+        final mangas = await _scraper.getLatestUpdates(srcName);
+        for (final m in mangas) {
+          final t = m.title.toLowerCase().trim();
+          if (t.isEmpty || !seenTitles.add(t)) continue;
+          results.add(m.toJson());
+        }
+      } catch (e) {
+        debugPrint('[GomangService] $srcName latest failed: $e');
+      }
+    }));
+    return results;
+  }
+
   /// Get all mangas with pagination
   Future<List<dynamic>> getMangas({String source = 'mangalivre.blog', int page = 1}) async {
     try {
