@@ -52,3 +52,6 @@ app.*.map.json
 .env
 !.env.example
 
+# Local drop folder for downloaded .ipa artifacts (binary, not source)
+bild ipa/*.ipa
+
